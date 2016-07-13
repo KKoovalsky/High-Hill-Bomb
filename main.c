@@ -14,7 +14,7 @@ int main(void)
 {
 	//TODO: Za³¹czenie podœwietlenia
 	
-	
+	Timer0_init();
 	lcd_init();
 	
 	sei();

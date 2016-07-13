@@ -10,8 +10,13 @@
 #include <stdbool.h>
 
 #include "LCD/lcd44780.h"
+#include "ext_int.h"
+#include "keyboard.h"
 
 #define KEY_NUM (4)
+
+#define TIMER0_INT_EN (TIMSK0 |= (1<<OCIE0A))
+#define TIMER0_INT_DIS (TIMSK0 &= ~(1<<OCIE0A))
 
 extern volatile bool root_code_entered;
 
