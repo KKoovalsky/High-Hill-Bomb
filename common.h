@@ -6,7 +6,6 @@
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 #include <avr/sleep.h>
-#include <util/delay.h>
 
 #include "LCD/lcd44780.h"
 #include "ext_int.h"
@@ -18,6 +17,9 @@
 
 #define TIMER1_INT_EN (TIMSK1 |= (1<<OCIE1A))
 #define TIMER1_INT_DIS (TIMSK1 &= ~(1<<OCIE1A))
+
+#define TIMER2_INT_EN (TIMSK2 |= (1<<OCIE2A))
+#define TIMER2_INT_DIS (TIMSK2 &= ~(1<<OCIE2A))
 
 #define INT0_EN  (EIMSK |= (1<<INT0))
 #define INT0_DIS (EIMSK &= ~(1<<INT0))
@@ -35,8 +37,11 @@
 #define RIGHT_UNARM_PIN (1<<PB7)
 #define RIGHT_UNARM_PIN_STATE (PINB & RIGHT_UNARM_PIN)
 
+// Time after which LCD backlight switches off.
+#define TIMEOUT (10)
+
 typedef enum dev_state_e {
-	BLOCKED, ROOT_KEY_ENTERING, ROOT_KEY_ENTERED, UNARMED, ARMED, EXPLODED, UNARMING, NOT_EXPLODED
+	BLOCKED, ROOT_KEY_ENTERING, ROOT_KEY_ENTERED, UNARMED, ARMING, ARMED, EXPLODED, UNARMING, NOT_EXPLODED
 } dev_state_t;
 
 extern volatile dev_state_t dev_state;
@@ -52,11 +57,13 @@ extern volatile uint16_t delay_cnt_ms;
 extern volatile uint8_t keys_pressed[];
 extern volatile uint8_t keys_pressed_num;
 
+extern volatile uint16_t arm_bar_dur;
+
 inline void delay_ms_x (uint16_t ms_del) {
-	TIMER1_INT_EN;
+	TIMER2_INT_EN;
 	delay_cnt_ms = ms_del;
-	while(ms_del);
-	TIMER1_INT_EN;
+	while(delay_cnt_ms);
+	TIMER2_INT_EN;
 }
 
 inline void keys_pressed_tab_clr() {

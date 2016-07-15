@@ -4,8 +4,11 @@
 // Used for numeric keyboard multiplexation.
 void Timer0_init();
 
-// Used for delays.
+// Used when bomb armed.
 void Timer1_init();
+
+// Used for delays.
+void Timer2_init();
 
 void ext_int_init();
 
