@@ -1,10 +1,12 @@
 #ifndef EXT_INT_H_
 #define EXT_INT_H_
 
-void Timer0_init()
+// Used for numeric keyboard multiplexation.
+void Timer0_init();
+
+// Used for delays.
+void Timer1_init();
 
 void ext_int_init();
-
-void start_timeout();
 
 #endif /* EXT_INT_H_ */
