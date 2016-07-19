@@ -16,15 +16,38 @@ volatile uint8_t keys_pressed_num;
 
 volatile uint16_t arm_bar_dur;
 
+const char def_arm_key [] PROGMEM = "1993";
+
+inline void init_eeprom_if_default() {
+	if(eeprom_read_word(&to_boom_time) == 0xFFFF) eeprom_write_word(&to_boom_time, 40);
+	
+	if(eeprom_read_word(&to_unarm_time) == 0xFFFF) eeprom_write_word(&to_unarm_time, 5);
+	
+	for(uint8_t i = 0; i < KEY_NUM ; i ++) {
+		if(eeprom_read_byte(&arm_code[i]) == 0xFF) eeprom_write_byte(&arm_code[i], pgm_read_byte(&def_arm_key[i]));
+	}
+	
+	if(eeprom_read_byte(&sw_off_while_armed) == 0xFF) eeprom_write_byte(&sw_off_while_armed, 0);
+}
+
+
 int main(void) {
 	
 	// Buzzer pin.
 	DDRB |= (1<<PB5);
 
 	// Unarming pins.
-	DDRB &= ~((1<<PB6) | (1<<PB7));
+	DDRD &= ~((1<<PD3) | (1<<PD4));
+	
+	// Numerical keyboard pins.
+	DDRD |= (1<<PD5) | (1<<PD6) | (1<<PD7);
+	DDRB &= ~((1<<PB0) | (1<<PB1) | (1<<PB2) | (1<<PB3));
+	
+	init_eeprom_if_default();
 	
 	keys_pressed_tab_clr();
+	
+	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 	
 	Timer0_init();
 	Timer1_init();
@@ -146,7 +169,7 @@ int main(void) {
 		}
 		
 		//Sleep and switch off backlight.
-			
+		if(!(dev_state == ARMED)) sleep_mode();	
     }
 }
 

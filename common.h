@@ -31,11 +31,11 @@
 #define BUZZER_CHECK_STATE (PINB & BUZZER_PIN)
 #define BOOOOOOM (dev_state = EXPLODED)
 
-#define LEFT_UNARM_PIN (1<<PB6)
-#define LEFT_UNARM_PIN_STATE (PINB & LEFT_UNARM_PIN)
+#define LEFT_UNARM_PIN (1<<PD3)
+#define LEFT_UNARM_PIN_STATE (PIND & LEFT_UNARM_PIN)
 
-#define RIGHT_UNARM_PIN (1<<PB7)
-#define RIGHT_UNARM_PIN_STATE (PINB & RIGHT_UNARM_PIN)
+#define RIGHT_UNARM_PIN (1<<PD4)
+#define RIGHT_UNARM_PIN_STATE (PIND & RIGHT_UNARM_PIN)
 
 // Time after which LCD backlight switches off.
 #define TIMEOUT (10)
@@ -70,5 +70,6 @@ inline void keys_pressed_tab_clr() {
 	keys_pressed[0] = keys_pressed[1] = keys_pressed[2] = keys_pressed[3] = ' ';
 	keys_pressed[4] = '\0';
 }
+
 
 #endif /* COMON_H_ */

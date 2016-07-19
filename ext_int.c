@@ -92,7 +92,7 @@ ISR(TIMER1_COMPA_vect) {
 	
 	if(dev_state == UNARMING) {
 		if(sec_cnt == TIMER1_INT_FREQ_INT - 1) to_unarm_cnt--;
-		if(!to_unarm_cnt) { TIMER1_INT_DIS; dev_state = NOT_EXPLODED; return; }
+		if(!to_unarm_cnt) { TIMER1_INT_DIS; dev_state = NOT_EXPLODED; eeprom_write_byte(&sw_off_while_armed, 0); return; }
 		if(RIGHT_UNARM_PIN_STATE || LEFT_UNARM_PIN_STATE) {
 			to_unarm_cnt = eeprom_read_word(&to_unarm_time);
 			dev_state = ARMED;
