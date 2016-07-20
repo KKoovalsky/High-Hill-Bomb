@@ -31,10 +31,12 @@ inline void init_eeprom_if_default() {
 }
 
 
-int main(void) {
+int main(void) {	
 	
 	// Buzzer pin.
 	DDRB |= (1<<PB5);
+	
+	DDRC |= (1<<PC0);
 
 	// Unarming pins.
 	DDRD &= ~((1<<PD3) | (1<<PD4));
@@ -169,7 +171,7 @@ int main(void) {
 		}
 		
 		//Sleep and switch off backlight.
-		if(!(dev_state == ARMED)) sleep_mode();	
+		if(dev_state == UNARMED) sleep_mode();	
     }
 }
 

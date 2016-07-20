@@ -54,15 +54,15 @@ void Timer2_init() {
 
 void ext_int_init() {
 	
-	// Falling edge of INT0 pin generates interrupt.
-	EICRA |= (1<<ISC01);
+	// Falling edge of INT1 pin generates interrupt.
+	EICRA |= (1<<ISC11);
 	
-	// Allow interrupt on INT0 pin.
-	INT0_EN;
+	// Allow interrupt on INT1 pin.
+	INT1_EN;
 }
 
 
-ISR(INT0_vect) {
+ISR(INT1_vect) {
 	if(dev_state == BLOCKED) {
 		dev_state = ROOT_KEY_ENTERING;
 		delay_cnt_ms = 0;
@@ -78,7 +78,8 @@ ISR(INT0_vect) {
 	TIMER0_INT_EN;
 	
 	// Disable interrupt.
-	INT0_DIS;
+	INT1_DIS;
+
 }
 ISR(TIMER2_COMPA_vect) {
 	if(!delay_cnt_ms) return;
@@ -110,7 +111,7 @@ ISR(TIMER1_COMPA_vect) {
 		// Static variable used for count seconds.
 		if(sec_cnt == TIMER1_INT_FREQ_INT - 1) to_boom_cnt--;
 		
-		if(!to_boom_cnt) { TIMER1_INT_DIS; BOOOOOOM; eeprom_write_byte(&sw_off_while_armed, 0); INT0_EN; return; }
+		if(!to_boom_cnt) { TIMER1_INT_DIS; BOOOOOOM; eeprom_write_byte(&sw_off_while_armed, 0); INT1_EN; return; }
 		
 		// Turn on buzzer at 0.5 s interval with 0.25 ms duration (like always).	
 		if(to_boom_cnt <= quarter_to_boom_time) { BUZZER_SW; return; }
@@ -149,6 +150,9 @@ ISR(TIMER0_COMPA_vect) {
 		PORTD |= (1 << (col + 4));
 		for (uint8_t row = 0; row < 4; row ++) {
 			if(PINB & (1 << row)) {
+				
+				LED_TOG;
+				
 				PORTD &= ~(1 << (col + 4));
 				switch(row) {
 					case 3:
@@ -200,7 +204,8 @@ ISR(TIMER0_COMPA_vect) {
 					return;
 				}
 			}
-		} 
+		}
+		PORTD &= ~(1 << (col + 4)); 
 	}
 		
 	#define KEY_PRESS_IGNORED (TIMEOUT * TIMER0_INT_FREQ)
@@ -212,6 +217,6 @@ ISR(TIMER0_COMPA_vect) {
 		keys_pressed_tab_clr();
 		keys_pressed_num = 0;
 		TIMER0_INT_DIS;
-		INT0_EN;
+		INT1_EN;
 	}
 }

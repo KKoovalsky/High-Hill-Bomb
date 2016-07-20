@@ -21,8 +21,8 @@
 #define TIMER2_INT_EN (TIMSK2 |= (1<<OCIE2A))
 #define TIMER2_INT_DIS (TIMSK2 &= ~(1<<OCIE2A))
 
-#define INT0_EN  (EIMSK |= (1<<INT0))
-#define INT0_DIS (EIMSK &= ~(1<<INT0))
+#define INT1_EN  (EIMSK |= (1<<INT1))
+#define INT1_DIS (EIMSK &= ~(1<<INT1))
 
 #define BUZZER_PIN (1<<PB5)
 #define BUZZER_SET (PORTB |= BUZZER_PIN)
@@ -71,5 +71,8 @@ inline void keys_pressed_tab_clr() {
 	keys_pressed[4] = '\0';
 }
 
+#define LED_ON (PORTC |= (1<<PC0))
+#define LED_OFF (PORTC &= ~(1<<PC0))
+#define LED_TOG (PORTC ^= (1<<PC0))
 
 #endif /* COMON_H_ */
