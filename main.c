@@ -36,14 +36,21 @@ int main(void) {
 	// Buzzer pin.
 	DDRB |= (1<<PB5);
 	
+	// Debug LED pin.
 	DDRC |= (1<<PC0);
 
 	// Unarming pins.
 	DDRD &= ~((1<<PD3) | (1<<PD4));
 	
 	// Numerical keyboard pins.
-	DDRD |= (1<<PD5) | (1<<PD6) | (1<<PD7);
+	//DDRD |= (1<<PD5) | (1<<PD6) | (1<<PD7);
+	
+	// Keyboard row input pins.
 	DDRB &= ~((1<<PB0) | (1<<PB1) | (1<<PB2) | (1<<PB3));
+	// Pullups.
+	PORTB |= (1<<PB0) | (1<<PB1) | (1<<PB2) | (1<<PB3);
+	// Keyboard column outputs - set 0 state (HIGH-Z, when DDR bits set to zero)
+	PORTD &= ~((1<<PD5) | (1<<PD6) | (1<<PD7));
 	
 	init_eeprom_if_default();
 	

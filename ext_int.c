@@ -8,18 +8,31 @@ volatile uint16_t quarter_to_boom_time;
 
 volatile uint16_t to_unarm_cnt;
 
+inline void Timer0_start() {
+	// Start Timer and set prescaling.
+	TCCR0B |= (1<<CS02) | (1<<CS00);
+	
+	// Clear timer register.
+	TCNT0 = 0;
+}
+
+inline void Timer0_stop() {
+	// Start Timer and set prescaling.
+	TCCR0B &= ~((1<<CS02) | (1<<CS00));
+	
+}
+
 void Timer0_init() {
 	// CTC mode set.
 	TCCR0A |= (1<<WGM01);
-	
-	// Start Timer and set prescaling.
-	TCCR0B |= (1<<CS02) | (1<<CS00);
 	
 	#define TIMER0_PRESCALER (1024.0)
 	#define TIMER0_INT_FREQ (10.0)
 	
 	// Set ~25 ms interrupt
 	OCR0A = F_CPU / TIMER0_PRESCALER / TIMER0_INT_FREQ - 0.5;
+	
+	TIMER0_INT_EN;
 }
 
 void Timer1_init() {
@@ -75,7 +88,7 @@ ISR(INT1_vect) {
 	keys_pressed_tab_clr();
 	
 	// Enable Timer0 overflow interrupt.
-	TIMER0_INT_EN;
+	Timer0_start();
 	
 	// Disable interrupt.
 	INT1_DIS;
@@ -130,10 +143,15 @@ ISR(TIMER1_COMPA_vect) {
 }
 
 ISR(TIMER0_COMPA_vect) {
+	
+	// Statements used to help handling with long key pressing.
 	#define LAST_STATE_IGNORE (0xFF)
 	static uint8_t last_state_row = LAST_STATE_IGNORE;
 	static uint8_t last_state_col = LAST_STATE_IGNORE;
 	
+	// Statements used to bring avr in sleep mode if keys wouldn't be pressed for TIMEOUT seconds.
+	#define KEY_PRESS_IGNORED (TIMEOUT * TIMER0_INT_FREQ)
+	static uint16_t key_not_pressed_cnt = 0;
 	
 	if(last_state_col != LAST_STATE_IGNORE) {
 		PORTD |= (1 << (last_state_col + 4));
@@ -145,15 +163,17 @@ ISR(TIMER0_COMPA_vect) {
 		last_state_row = last_state_col = LAST_STATE_IGNORE;
 	}
 	
+	DDRD &= ~((1<<PD5) | (1<<PD6) | (1<<PD7));
 	for(uint8_t col = 0; col < 3; col++) {
-		//	Set PD5, PD6 or PD7.
-		PORTD |= (1 << (col + 4));
+		DDRD |= (1 << (col + 4));
 		for (uint8_t row = 0; row < 4; row ++) {
-			if(PINB & (1 << row)) {
+			if(!(PINB & (1 << row))) {
 				
 				LED_TOG;
 				
-				PORTD &= ~(1 << (col + 4));
+				key_not_pressed_cnt = 0;
+				
+				DDRD &= ~((1<<PD5) | (1<<PD6) | (1<<PD7));
 				switch(row) {
 					case 3:
 						switch(col) {
@@ -183,7 +203,7 @@ ISR(TIMER0_COMPA_vect) {
 						
 					keys_pressed_num = 0;
 					last_state_row = last_state_col = LAST_STATE_IGNORE;
-					TIMER0_INT_DIS;
+					Timer0_stop();
 						
 					if(dev_state == ROOT_KEY_ENTERING) {
 						dev_state = UNARMED;
@@ -205,18 +225,16 @@ ISR(TIMER0_COMPA_vect) {
 				}
 			}
 		}
-		PORTD &= ~(1 << (col + 4)); 
+		DDRD &= ~((1<<PD5) | (1<<PD6) | (1<<PD7));
 	}
 		
-	#define KEY_PRESS_IGNORED (TIMEOUT * TIMER0_INT_FREQ)
-	static uint16_t key_not_pressed_cnt = 0;
 	key_not_pressed_cnt ++;
 	if(key_not_pressed_cnt == KEY_PRESS_IGNORED) {
 		if(dev_state == ROOT_KEY_ENTERING) dev_state = BLOCKED;
 		else dev_state = UNARMED;
 		keys_pressed_tab_clr();
 		keys_pressed_num = 0;
-		TIMER0_INT_DIS;
+		Timer0_stop();
 		INT1_EN;
 	}
 }
