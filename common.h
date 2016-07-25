@@ -28,7 +28,7 @@
 #define BUZZER_SET (PORTB |= BUZZER_PIN)
 #define BUZZER_CLR (PORTB &= ~BUZZER_PIN)
 #define BUZZER_SW (PORTB ^= BUZZER_PIN)
-#define BUZZER_CHECK_STATE (PINB & BUZZER_PIN)
+
 #define BOOOOOOM (dev_state = EXPLODED)
 
 #define LEFT_UNARM_PIN (1<<PD3)
@@ -74,5 +74,9 @@ inline void keys_pressed_tab_clr() {
 #define LED_ON (PORTC |= (1<<PC0))
 #define LED_OFF (PORTC &= ~(1<<PC0))
 #define LED_TOG (PORTC ^= (1<<PC0))
+
+#define LED1_ON (PORTC |= (1<<PC1))
+#define LED1_OFF (PORTC &= ~(1<<PC1))
+#define LED1_TOG (PORTC ^= (1<<PC1))
 
 #endif /* COMON_H_ */

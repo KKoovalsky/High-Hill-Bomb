@@ -37,13 +37,10 @@ int main(void) {
 	DDRB |= (1<<PB5);
 	
 	// Debug LED pin.
-	DDRC |= (1<<PC0);
+	DDRC |= (1<<PC0) | (1<<PC1);
 
 	// Unarming pins.
 	DDRD &= ~((1<<PD3) | (1<<PD4));
-	
-	// Numerical keyboard pins.
-	//DDRD |= (1<<PD5) | (1<<PD6) | (1<<PD7);
 	
 	// Keyboard row input pins.
 	DDRB &= ~((1<<PB0) | (1<<PB1) | (1<<PB2) | (1<<PB3));
@@ -100,39 +97,44 @@ int main(void) {
 		uint8_t local_keys_pressed_num = 0;
 		while(dev_state == ROOT_KEY_ENTERING) {
 			
-			// When wrong key entered:
-			if(local_keys_pressed_num > keys_pressed_num) {
-				lcd_str((char*)keys_pressed);
-				lcd_locate(1, 0);
-				lcd_str_P(PSTR("Zly kod"));
-				local_keys_pressed_num = keys_pressed_num;
-			}
-			
 			// When key entered update LCD content:
 			if(local_keys_pressed_num != keys_pressed_num) {
+				LED1_TOG;
 				lcd_cls();
 				lcd_str((char*)keys_pressed);
+				
+				// When wrong code entered.
+				if(local_keys_pressed_num > keys_pressed_num) {
+					lcd_locate(1, 0);
+					lcd_str_P(PSTR("Zly kod"));
+				}
 				local_keys_pressed_num = keys_pressed_num;
 			}
+			// TODO: Turn off backlight.
 		}
 		
 		lcd_cls();
 		lcd_str_P(PSTR("Odblokowano"));
-		lcd_locate(1, 0);
-		lcd_str_P(PSTR("Wpisz kod"));
-		delay_ms_x(2000);
+		delay_ms_x(5000);
 		lcd_cls();
 	}
 	
 	dev_state = UNARMED;
+	
+	lcd_str_P(PSTR("WITAJ"));
     
     while (1) {
 		
 		if(dev_state == EXPLODED) {
 			BUZZER_SET;
+			lcd_cls();
+			lcd_str_P(PSTR("Terrorysci"));
+			lcd_locate(1, 0);
+			lcd_str_P(PSTR("wygrali!"));
 			delay_ms_x(5000);
 			BUZZER_CLR;
 			dev_state = UNARMED;
+			INT1_EN;
 		}
 		
 		if(dev_state == UNARMING) {
@@ -155,26 +157,35 @@ int main(void) {
 			delay_ms_x(2000);
 			// TODO: Turn off backlight.
 			dev_state = UNARMED;
+			INT1_EN;
 		}
 		
 		uint8_t local_keys_pressed_num = 0;
 		while(dev_state == ARMING) {
-			// TODO: Turn on backlight.
-			// When wrong key entered:
-			if(local_keys_pressed_num > keys_pressed_num) {
-				lcd_str((char*)keys_pressed);
-				lcd_locate(1, 0);
-				lcd_str_P(PSTR("Zly kod"));
-				local_keys_pressed_num = keys_pressed_num;
-			}
-				
+			
 			// When key entered update LCD content:
 			if(local_keys_pressed_num != keys_pressed_num) {
+
 				lcd_cls();
 				lcd_str((char*)keys_pressed);
+				
+				// When wrong code entered.
+				if(local_keys_pressed_num > keys_pressed_num) {
+					lcd_locate(1, 0);
+					lcd_str_P(PSTR("Zly kod"));
+				}
 				local_keys_pressed_num = keys_pressed_num;
 			}
 			// TODO: Turn off backlight.
+		}
+		
+		if(dev_state == ARMED) {
+			lcd_cls();
+			lcd_str((char *)keys_pressed);
+			lcd_locate(1, 0);
+			lcd_str_P(PSTR("UZBROJONO!"));
+			delay_ms_x(2000);
+			while(dev_state == ARMED);
 		}
 		
 		//Sleep and switch off backlight.

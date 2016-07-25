@@ -2,6 +2,8 @@
 #include "ext_int.h"
 #include "key.h"
 
+#include <avr/cpufunc.h>
+
 volatile uint16_t to_boom_cnt;
 volatile uint16_t half_to_boom_time;
 volatile uint16_t quarter_to_boom_time;
@@ -29,7 +31,7 @@ void Timer0_init() {
 	#define TIMER0_PRESCALER (1024.0)
 	#define TIMER0_INT_FREQ (10.0)
 	
-	// Set ~25 ms interrupt
+	// Set ~100 ms interrupt
 	OCR0A = F_CPU / TIMER0_PRESCALER / TIMER0_INT_FREQ - 0.5;
 	
 	TIMER0_INT_EN;
@@ -37,7 +39,7 @@ void Timer0_init() {
 
 void Timer1_init() {
 	// CTC mode set.
-	TCCR1A |= (1<<WGM12);
+	TCCR1B |= (1<<WGM12);
 	
 	#define TIMER1_PRESCALER (8.0)
 	#define TIMER1_INT_FREQ (4.0)
@@ -47,7 +49,7 @@ void Timer1_init() {
 	TCCR1B |= (1<<CS11);
 	
 	// Set ~250 ms interrupt
-	OCR1A = F_CPU / TIMER1_INT_FREQ / TIMER1_PRESCALER - 0.5;
+	OCR1A = F_CPU / TIMER1_PRESCALER / TIMER1_INT_FREQ  - 0.5;
 }
 
 void Timer2_init() {
@@ -104,6 +106,8 @@ ISR(TIMER1_COMPA_vect) {
 	static uint8_t sec_cnt = 0;
 	sec_cnt = (sec_cnt + 1) % TIMER1_INT_FREQ_INT;
 	
+	LED_TOG;
+	
 	if(dev_state == UNARMING) {
 		if(sec_cnt == TIMER1_INT_FREQ_INT - 1) to_unarm_cnt--;
 		if(!to_unarm_cnt) { TIMER1_INT_DIS; dev_state = NOT_EXPLODED; eeprom_write_byte(&sw_off_while_armed, 0); return; }
@@ -118,6 +122,7 @@ ISR(TIMER1_COMPA_vect) {
 		
 		if(!(RIGHT_UNARM_PIN_STATE || LEFT_UNARM_PIN_STATE)) {
 			dev_state = UNARMING;
+			BUZZER_CLR;
 			return;
 		}
 		
@@ -131,14 +136,14 @@ ISR(TIMER1_COMPA_vect) {
 		
 		// Turn on buzzer at 1 s interval with 0.25 ms duration (like always).		
 		if(to_boom_cnt <= half_to_boom_time) {
-			if(BUZZER_CHECK_STATE) BUZZER_CLR;
+			BUZZER_CLR;
 			if(!sec_cnt) BUZZER_SET;
 			return;
 		}
 		
 		// Turn on buzzer at 2 s interval with 0.25 ms duration (like always).	
-		if(BUZZER_CHECK_STATE) BUZZER_CLR;
-		if(to_boom_cnt % 2) BUZZER_SET;
+		BUZZER_CLR;
+		if((to_boom_cnt % 2) && (!sec_cnt)) BUZZER_SET;
 	}
 }
 
@@ -154,9 +159,14 @@ ISR(TIMER0_COMPA_vect) {
 	static uint16_t key_not_pressed_cnt = 0;
 	
 	if(last_state_col != LAST_STATE_IGNORE) {
-		PORTD |= (1 << (last_state_col + 4));
-		if(PINB & (1 << last_state_row)) {
+		DDRD |= (1 << (last_state_col + 5));
+		
+		// No operation to get into steady state (without it long keypad pressing will spoil the code entered).
+		_NOP(); _NOP();
+		
+		if(!(PINB & (1 << last_state_row))) {
 			// Key still pressed.
+			DDRD &= ~((1<<PD5) | (1<<PD6) | (1<<PD7));
 			return;
 		}
 		// Key not pressed. Continue checking.
@@ -165,15 +175,19 @@ ISR(TIMER0_COMPA_vect) {
 	
 	DDRD &= ~((1<<PD5) | (1<<PD6) | (1<<PD7));
 	for(uint8_t col = 0; col < 3; col++) {
-		DDRD |= (1 << (col + 4));
+		DDRD |= (1 << (col + 5));
 		for (uint8_t row = 0; row < 4; row ++) {
 			if(!(PINB & (1 << row))) {
+				
+				if(!keys_pressed_num)
+					keys_pressed_tab_clr();
 				
 				LED_TOG;
 				
 				key_not_pressed_cnt = 0;
 				
 				DDRD &= ~((1<<PD5) | (1<<PD6) | (1<<PD7));
+				
 				switch(row) {
 					case 3:
 						switch(col) {
@@ -191,11 +205,10 @@ ISR(TIMER0_COMPA_vect) {
 					
 				keys_pressed_num ++;
 					
-				if(keys_pressed_num == KEY_NUM) {
+				if(keys_pressed_num >= KEY_NUM) {
 					for(uint8_t i = 0; i < KEY_NUM; i++) {
 						//	Check if correct key entered.
 						if(keys_pressed[i] != (dev_state == ROOT_KEY_ENTERING ? pgm_read_byte(&key[i]) : eeprom_read_byte(&arm_code[i]))) {
-							keys_pressed_tab_clr();
 							keys_pressed_num = 0;
 							return;
 						}
@@ -208,6 +221,7 @@ ISR(TIMER0_COMPA_vect) {
 					if(dev_state == ROOT_KEY_ENTERING) {
 						dev_state = UNARMED;
 						eeprom_write_byte(&sw_off_while_armed, 0);
+						INT1_EN;
 					} else {
 						dev_state = ARMED;
 							
@@ -215,14 +229,13 @@ ISR(TIMER0_COMPA_vect) {
 						arm_bar_dur = to_unarm_cnt / (double)LCD_COLS * 1000.0;
 							
 						to_boom_cnt = eeprom_read_word(&to_boom_time);
-						half_to_boom_time = to_boom_cnt << 1;
-						quarter_to_boom_time = half_to_boom_time << 1;
+						half_to_boom_time = to_boom_cnt >> 1;
+						quarter_to_boom_time = half_to_boom_time >> 1;
 						eeprom_write_byte(&sw_off_while_armed, 1);
 						TIMER1_INT_EN;
 					}
-					
-					return;
-				}
+				}					
+				return;
 			}
 		}
 		DDRD &= ~((1<<PD5) | (1<<PD6) | (1<<PD7));
@@ -232,7 +245,6 @@ ISR(TIMER0_COMPA_vect) {
 	if(key_not_pressed_cnt == KEY_PRESS_IGNORED) {
 		if(dev_state == ROOT_KEY_ENTERING) dev_state = BLOCKED;
 		else dev_state = UNARMED;
-		keys_pressed_tab_clr();
 		keys_pressed_num = 0;
 		Timer0_stop();
 		INT1_EN;
