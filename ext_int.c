@@ -10,7 +10,7 @@ volatile uint16_t quarter_to_boom_time;
 
 volatile uint16_t to_unarm_cnt;
 
-inline void Timer0_start() {
+static inline void Timer0_start() {
 	// Start Timer and set prescaling.
 	TCCR0B |= (1<<CS02) | (1<<CS00);
 	
@@ -18,10 +18,9 @@ inline void Timer0_start() {
 	TCNT0 = 0;
 }
 
-inline void Timer0_stop() {
+static inline void Timer0_stop() {
 	// Start Timer and set prescaling.
 	TCCR0B &= ~((1<<CS02) | (1<<CS00));
-	
 }
 
 void Timer0_init() {
@@ -56,15 +55,13 @@ void Timer2_init() {
 	// Set CTC mode.
 	TCCR2A |= (1<<WGM21);
 	
-	// Set prescaling and start Timer.
-	TCCR2B |= (1<<CS21);
-	
 	#define TIMER2_PRESCALER (8.0)
 	#define TIMER2_INT_FREQ (1000.0)
 	
 	// Set ~1ms interrupt.
-	OCR2A = F_CPU / TIMER2_PRESCALER / TIMER2_INT_FREQ - 0.5;
+	OCR2A = F_CPU / TIMER2_PRESCALER / TIMER2_INT_FREQ - 1;
 	
+	TIMER2_INT_EN;
 }
 
 void ext_int_init() {
@@ -96,6 +93,7 @@ ISR(INT1_vect) {
 	INT1_DIS;
 
 }
+
 ISR(TIMER2_COMPA_vect) {
 	if(!delay_cnt_ms) return;
 	delay_cnt_ms--;
@@ -105,8 +103,6 @@ ISR(TIMER1_COMPA_vect) {
 	
 	static uint8_t sec_cnt = 0;
 	sec_cnt = (sec_cnt + 1) % TIMER1_INT_FREQ_INT;
-	
-	LED_TOG;
 	
 	if(dev_state == UNARMING) {
 		if(sec_cnt == TIMER1_INT_FREQ_INT - 1) to_unarm_cnt--;
@@ -121,6 +117,7 @@ ISR(TIMER1_COMPA_vect) {
 	if(dev_state == ARMED) {
 		
 		if(!(RIGHT_UNARM_PIN_STATE || LEFT_UNARM_PIN_STATE)) {
+			sec_cnt = 0;
 			dev_state = UNARMING;
 			BUZZER_CLR;
 			return;
@@ -181,8 +178,6 @@ ISR(TIMER0_COMPA_vect) {
 				
 				if(!keys_pressed_num)
 					keys_pressed_tab_clr();
-				
-				LED_TOG;
 				
 				key_not_pressed_cnt = 0;
 				

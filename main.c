@@ -30,6 +30,12 @@ inline void init_eeprom_if_default() {
 	if(eeprom_read_byte(&sw_off_while_armed) == 0xFF) eeprom_write_byte(&sw_off_while_armed, 0);
 }
 
+void delay_ms_x (uint16_t ms_del) {
+	delay_cnt_ms = ms_del;
+	Timer2_start();
+	while(delay_cnt_ms);
+	Timer2_stop();
+}
 
 int main(void) {	
 	
@@ -99,7 +105,6 @@ int main(void) {
 			
 			// When key entered update LCD content:
 			if(local_keys_pressed_num != keys_pressed_num) {
-				LED1_TOG;
 				lcd_cls();
 				lcd_str((char*)keys_pressed);
 				
@@ -121,7 +126,7 @@ int main(void) {
 	
 	dev_state = UNARMED;
 	
-	lcd_str_P(PSTR("WITAJ"));
+	lcd_str_P(PSTR("Rozbrojona"));
     
     while (1) {
 		
@@ -141,10 +146,11 @@ int main(void) {
 			// TODO: Turn on backlight.
 			lcd_cls();
 			lcd_str_P(PSTR("Rozbrajanie..."));
+			lcd_locate(1, 0);
 			for(uint8_t i = 0 ; i < LCD_COLS && dev_state == UNARMING; i ++) {
-				lcd_locate(1, i);
-				lcd_char('-');
+				lcd_char(0xFF);
 				delay_ms_x(arm_bar_dur);
+				LED_TOG;
 			}
 			lcd_cls();
 			// TODO: Turn off backlight.

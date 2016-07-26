@@ -13,7 +13,6 @@
 #define KEY_NUM (4)
 
 #define TIMER0_INT_EN (TIMSK0 |= (1<<OCIE0A))
-#define TIMER0_INT_DIS (TIMSK0 &= ~(1<<OCIE0A))
 
 #define TIMER1_INT_EN (TIMSK1 |= (1<<OCIE1A))
 #define TIMER1_INT_DIS (TIMSK1 &= ~(1<<OCIE1A))
@@ -40,6 +39,14 @@
 // Time after which LCD backlight switches off.
 #define TIMEOUT (10)
 
+#define LED_ON (PORTC |= (1<<PC0))
+#define LED_OFF (PORTC &= ~(1<<PC0))
+#define LED_TOG (PORTC ^= (1<<PC0))
+
+#define LED1_ON (PORTC |= (1<<PC1))
+#define LED1_OFF (PORTC &= ~(1<<PC1))
+#define LED1_TOG (PORTC ^= (1<<PC1))
+
 typedef enum dev_state_e {
 	BLOCKED, ROOT_KEY_ENTERING, ROOT_KEY_ENTERED, UNARMED, ARMING, ARMED, EXPLODED, UNARMING, NOT_EXPLODED
 } dev_state_t;
@@ -59,24 +66,24 @@ extern volatile uint8_t keys_pressed_num;
 
 extern volatile uint16_t arm_bar_dur;
 
-inline void delay_ms_x (uint16_t ms_del) {
-	TIMER2_INT_EN;
-	delay_cnt_ms = ms_del;
-	while(delay_cnt_ms);
-	TIMER2_INT_EN;
-}
-
 inline void keys_pressed_tab_clr() {
 	keys_pressed[0] = keys_pressed[1] = keys_pressed[2] = keys_pressed[3] = ' ';
 	keys_pressed[4] = '\0';
 }
 
-#define LED_ON (PORTC |= (1<<PC0))
-#define LED_OFF (PORTC &= ~(1<<PC0))
-#define LED_TOG (PORTC ^= (1<<PC0))
+inline void Timer2_start() {
+	// Clear timer register.
+	TCNT2 = 0;
+	
+	// Start Timer and set prescaling.
+	TCCR2B |= (1<<CS21);
+}
 
-#define LED1_ON (PORTC |= (1<<PC1))
-#define LED1_OFF (PORTC &= ~(1<<PC1))
-#define LED1_TOG (PORTC ^= (1<<PC1))
+inline void Timer2_stop() {
+	// Start Timer and set prescaling.
+	TCCR2B &= ~((1<<CS22) | (1<<CS21) | (1<<CS20));
+}
+
+void delay_ms_x (uint16_t ms_del);
 
 #endif /* COMON_H_ */
