@@ -74,7 +74,6 @@ void code_entering(dev_state_t context) {
 			}
 			local_keys_pressed_num = keys_pressed_num;
 		}
-		// TODO: Turn off backlight.
 	}
 }
 
@@ -145,6 +144,8 @@ int main(void) {
 		
 		if(dev_state == ADMIN_MOD_CODE_CHANGE) {
 			code_entering(ADMIN_MOD_CODE_CHANGE);
+			
+			// After changes inform about the changes.
 			lcd_cls();
 			lcd_str_P(PSTR("Zmieniono kod na"));
 			lcd_locate(1, 0);
@@ -154,7 +155,7 @@ int main(void) {
 		}
 		
 		if(dev_state == ADMIN_MOD_TIME_CHANGE) {
-			// Maximum 9999 seconds can be set
+			// Maximum 9999 seconds can be set - * or # pressing accepts the value
 			lcd_cls();
 			lcd_str_P(PSTR("Zatwierdz *, #:"));
 			uint8_t local_keys_pressed_num = 0;
@@ -165,6 +166,7 @@ int main(void) {
 					local_keys_pressed_num = keys_pressed_num;
 				}
 			}
+			// After changes inform about the changes.
 			lcd_cls();
 			lcd_str_P(PSTR("Zmieniono czas"));
 			lcd_locate(1, 0);
@@ -186,6 +188,7 @@ int main(void) {
 		
 		dev_state = BLOCKED;
 		
+		// Inform why the device is blocked.
 		while(dev_state == BLOCKED) {
 			lcd_str_P(PSTR("Wyl. w trakcie"));
 			lcd_locate(1, 0);
@@ -279,8 +282,7 @@ int main(void) {
 			while(dev_state == ARMED);
 			LED_OFF;
 		}
-		
-		//Sleep and switch off backlight.
+	
 		if(dev_state == UNARMED) sleep_mode();	
     }
 }
