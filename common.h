@@ -6,6 +6,7 @@
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 #include <avr/sleep.h>
+#include <avr/cpufunc.h>
 
 #include "LCD/lcd44780.h"
 #include "ext_int.h"
@@ -20,7 +21,7 @@
 #define TIMER2_INT_EN (TIMSK2 |= (1<<OCIE2A))
 #define TIMER2_INT_DIS (TIMSK2 &= ~(1<<OCIE2A))
 
-#define INT1_EN  (EIMSK |= (1<<INT1))
+#define INT1_EN  EIFR |= (1<<INTF1); EIMSK |= (1<<INT1)
 #define INT1_DIS (EIMSK &= ~(1<<INT1))
 
 #define BUZZER_PIN (1<<PB5)
@@ -39,16 +40,15 @@
 // Time after which LCD backlight switches off.
 #define TIMEOUT (10)
 
-#define LED_ON (PORTC |= (1<<PC0))
-#define LED_OFF (PORTC &= ~(1<<PC0))
-#define LED_TOG (PORTC ^= (1<<PC0))
+#define LED_OFF (PORTC |= (1<<PC0))
+#define LED_ON (PORTC &= ~(1<<PC0))
 
-#define LED1_ON (PORTC |= (1<<PC1))
-#define LED1_OFF (PORTC &= ~(1<<PC1))
-#define LED1_TOG (PORTC ^= (1<<PC1))
+#define TRUE (1)
+#define FALSE (0)
 
 typedef enum dev_state_e {
-	BLOCKED, ROOT_KEY_ENTERING, ROOT_KEY_ENTERED, UNARMED, ARMING, ARMED, EXPLODED, UNARMING, NOT_EXPLODED
+	BLOCKED, ROOT_KEY_ENTERING, ROOT_KEY_ENTERED, UNARMED, ARMING, ARMED, EXPLODED, 
+	UNARMING, NOT_EXPLODED, ADMIN_MOD_UNAUTH, ADMIN_MOD_AUTH, ADMIN_MOD_CODE_CHANGE, ADMIN_MOD_TIME_CHANGE
 } dev_state_t;
 
 extern volatile dev_state_t dev_state;
@@ -71,6 +71,19 @@ inline void keys_pressed_tab_clr() {
 	keys_pressed[4] = '\0';
 }
 
+inline void Timer0_start() {
+	// Start Timer and set prescaling.
+	TCCR0B |= (1<<CS02) | (1<<CS00);
+	
+	// Clear timer register.
+	TCNT0 = 0;
+}
+
+inline void Timer0_stop() {
+	// Start Timer and set prescaling.
+	TCCR0B &= ~((1<<CS02) | (1<<CS00));
+}
+
 inline void Timer2_start() {
 	// Clear timer register.
 	TCNT2 = 0;
@@ -85,5 +98,7 @@ inline void Timer2_stop() {
 }
 
 void delay_ms_x (uint16_t ms_del);
+
+void code_entering(dev_state_t context);
 
 #endif /* COMON_H_ */

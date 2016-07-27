@@ -1,4 +1,5 @@
 #include "common.h"
+#include <util/atomic.h>
 
 uint8_t arm_code [KEY_NUM] EEMEM;
 uint16_t to_boom_time EEMEM;
@@ -18,7 +19,7 @@ volatile uint16_t arm_bar_dur;
 
 const char def_arm_key [] PROGMEM = "1993";
 
-inline void init_eeprom_if_default() {
+static inline void init_eeprom_if_default() {
 	if(eeprom_read_word(&to_boom_time) == 0xFFFF) eeprom_write_word(&to_boom_time, 40);
 	
 	if(eeprom_read_word(&to_unarm_time) == 0xFFFF) eeprom_write_word(&to_unarm_time, 5);
@@ -31,10 +32,50 @@ inline void init_eeprom_if_default() {
 }
 
 void delay_ms_x (uint16_t ms_del) {
+	uint8_t exit = FALSE;
 	delay_cnt_ms = ms_del;
+	
 	Timer2_start();
-	while(delay_cnt_ms);
+	
+	while(1) {
+		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+			if(!delay_cnt_ms) exit = TRUE;
+		}
+		if(exit) break;
+	}	
+	
 	Timer2_stop();
+}
+
+void code_entering(dev_state_t context) {
+	
+	uint8_t local_keys_pressed_num = 0;
+	lcd_cls();
+	lcd_str_P(PSTR("Wprowadz kod:"));
+		
+	while(dev_state == context) {
+
+		// When key entered update LCD content:
+		if(local_keys_pressed_num != keys_pressed_num) {
+				
+			lcd_locate(1, 0);
+			lcd_str((char*)keys_pressed);
+				
+			// Clear message about wrong code.
+			if(keys_pressed_num == 1) {
+				lcd_locate(1, 5);
+				lcd_str_P(PSTR("       "));
+			}
+				
+			// When wrong code entered.
+			if(local_keys_pressed_num > keys_pressed_num) {
+				lcd_locate(1, 5);
+				lcd_str_P(PSTR("Zly kod"));
+			}
+			local_keys_pressed_num = keys_pressed_num;
+		}
+		// TODO: Turn off backlight.
+	}
 }
 
 int main(void) {	
@@ -69,12 +110,79 @@ int main(void) {
 	
 	sei();
 
+	// Check if the admin mode is called ('5' key pressed at startup).
+	DDRD |=	(1<<PD6);
+	_NOP(); _NOP();
+	if(!(PINB & (1 << PB1))) {
+		DDRD &=	~(1<<PD6);
+		
+		LED_ON;
+	
+		dev_state = ADMIN_MOD_UNAUTH;
+		code_entering(ADMIN_MOD_UNAUTH);
+		
+		// Ask user what does he want to change.
+		while(dev_state == ADMIN_MOD_AUTH) {
+			lcd_str_P(PSTR("Co zmienic?"));
+			lcd_locate(1, 0);
+			lcd_str_P(PSTR("1.Kod uzbrojenia"));
+		
+			if(dev_state != ADMIN_MOD_AUTH) break;
+			delay_ms_x(2000);
+			lcd_cls();
+			if(dev_state != ADMIN_MOD_AUTH) break;
+			
+			lcd_str_P(PSTR("2.Czas do bum"));
+			lcd_locate(1, 0);
+			lcd_str_P(PSTR("3.Czas anty-bum"));
+			
+			if(dev_state != ADMIN_MOD_AUTH) break;
+			delay_ms_x(2000);
+			lcd_cls();
+		}
+		
+		lcd_cls();
+		
+		if(dev_state == ADMIN_MOD_CODE_CHANGE) {
+			code_entering(ADMIN_MOD_CODE_CHANGE);
+			lcd_cls();
+			lcd_str_P(PSTR("Zmieniono kod na"));
+			lcd_locate(1, 0);
+			lcd_str((char*)keys_pressed);
+			delay_ms_x(4000);
+			lcd_cls();
+		}
+		
+		if(dev_state == ADMIN_MOD_TIME_CHANGE) {
+			// Maximum 9999 seconds can be set
+			lcd_cls();
+			lcd_str_P(PSTR("Zatwierdz *, #:"));
+			uint8_t local_keys_pressed_num = 0;
+			while(dev_state == ADMIN_MOD_TIME_CHANGE) {
+				if(local_keys_pressed_num != keys_pressed_num) {
+					lcd_locate(1, 0);
+					lcd_str((char*)keys_pressed);
+					local_keys_pressed_num = keys_pressed_num;
+				}
+			}
+			lcd_cls();
+			lcd_str_P(PSTR("Zmieniono czas"));
+			lcd_locate(1, 0);
+			lcd_str_P(PSTR("na "));
+			lcd_str((char*)keys_pressed);
+			lcd_str_P(PSTR(" sekund"));
+			delay_ms_x(4000);
+			lcd_cls();
+		}
+		LED_OFF;
+	}
+	DDRD &=	~(1<<PD6);
+	
 	
 	// When device were switched off while armed.
 	if(eeprom_read_byte(&sw_off_while_armed)) {
-		
-		
-		//TODO: Za³¹czenie podœwietlenia
+	
+		LED_ON;
 		
 		dev_state = BLOCKED;
 		
@@ -95,42 +203,32 @@ int main(void) {
 			if(dev_state != BLOCKED) break;
 			delay_ms_x(2000);
 			lcd_cls();
-			// Will probably need lcd_locate(0, 0)
 		}
 		
 		lcd_cls();
-		//lcd_locate(0, 0);
-		uint8_t local_keys_pressed_num = 0;
-		while(dev_state == ROOT_KEY_ENTERING) {
-			
-			// When key entered update LCD content:
-			if(local_keys_pressed_num != keys_pressed_num) {
-				lcd_cls();
-				lcd_str((char*)keys_pressed);
-				
-				// When wrong code entered.
-				if(local_keys_pressed_num > keys_pressed_num) {
-					lcd_locate(1, 0);
-					lcd_str_P(PSTR("Zly kod"));
-				}
-				local_keys_pressed_num = keys_pressed_num;
-			}
-			// TODO: Turn off backlight.
+		
+		if(dev_state == ROOT_KEY_ENTERING) {
+			code_entering(ROOT_KEY_ENTERING);
 		}
 		
 		lcd_cls();
 		lcd_str_P(PSTR("Odblokowano"));
 		delay_ms_x(5000);
 		lcd_cls();
+		
+		LED_OFF;
 	}
 	
 	dev_state = UNARMED;
 	
-	lcd_str_P(PSTR("Rozbrojona"));
+	lcd_str_P(PSTR("Rozbrojona..."));
     
     while (1) {
 		
+		LED_OFF;
+		
 		if(dev_state == EXPLODED) {
+			LED_ON;
 			BUZZER_SET;
 			lcd_cls();
 			lcd_str_P(PSTR("Terrorysci"));
@@ -140,58 +238,46 @@ int main(void) {
 			BUZZER_CLR;
 			dev_state = UNARMED;
 			INT1_EN;
+			LED_OFF;
 		}
 		
 		if(dev_state == UNARMING) {
-			// TODO: Turn on backlight.
+			LED_ON;
 			lcd_cls();
 			lcd_str_P(PSTR("Rozbrajanie..."));
 			lcd_locate(1, 0);
 			for(uint8_t i = 0 ; i < LCD_COLS && dev_state == UNARMING; i ++) {
 				lcd_char(0xFF);
 				delay_ms_x(arm_bar_dur);
-				LED_TOG;
 			}
 			lcd_cls();
-			// TODO: Turn off backlight.
+			LED_OFF;
 		}
 		
 		if(dev_state == NOT_EXPLODED) {
-			// TODO: Turn on backlight.
+			LED_ON;
 			lcd_cls();
 			lcd_str_P(PSTR("Bomba rozbrojona"));
 			delay_ms_x(2000);
-			// TODO: Turn off backlight.
 			dev_state = UNARMED;
 			INT1_EN;
+			LED_OFF;
 		}
 		
-		uint8_t local_keys_pressed_num = 0;
-		while(dev_state == ARMING) {
-			
-			// When key entered update LCD content:
-			if(local_keys_pressed_num != keys_pressed_num) {
-
-				lcd_cls();
-				lcd_str((char*)keys_pressed);
-				
-				// When wrong code entered.
-				if(local_keys_pressed_num > keys_pressed_num) {
-					lcd_locate(1, 0);
-					lcd_str_P(PSTR("Zly kod"));
-				}
-				local_keys_pressed_num = keys_pressed_num;
-			}
-			// TODO: Turn off backlight.
+		if(dev_state == ARMING) {
+			LED_ON;
+			code_entering(ARMING);
+			LED_OFF;
 		}
 		
 		if(dev_state == ARMED) {
+			LED_ON;
 			lcd_cls();
 			lcd_str((char *)keys_pressed);
 			lcd_locate(1, 0);
 			lcd_str_P(PSTR("UZBROJONO!"));
-			delay_ms_x(2000);
 			while(dev_state == ARMED);
+			LED_OFF;
 		}
 		
 		//Sleep and switch off backlight.

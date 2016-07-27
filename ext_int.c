@@ -1,27 +1,13 @@
 #include "common.h"
 #include "ext_int.h"
 #include "key.h"
-
-#include <avr/cpufunc.h>
+#include <stdlib.h>
 
 volatile uint16_t to_boom_cnt;
 volatile uint16_t half_to_boom_time;
 volatile uint16_t quarter_to_boom_time;
 
 volatile uint16_t to_unarm_cnt;
-
-static inline void Timer0_start() {
-	// Start Timer and set prescaling.
-	TCCR0B |= (1<<CS02) | (1<<CS00);
-	
-	// Clear timer register.
-	TCNT0 = 0;
-}
-
-static inline void Timer0_stop() {
-	// Start Timer and set prescaling.
-	TCCR0B &= ~((1<<CS02) | (1<<CS00));
-}
 
 void Timer0_init() {
 	// CTC mode set.
@@ -151,6 +137,8 @@ ISR(TIMER0_COMPA_vect) {
 	static uint8_t last_state_row = LAST_STATE_IGNORE;
 	static uint8_t last_state_col = LAST_STATE_IGNORE;
 	
+	static uint16_t * ee_time_val_ptr;
+	
 	// Statements used to bring avr in sleep mode if keys wouldn't be pressed for TIMEOUT seconds.
 	#define KEY_PRESS_IGNORED (TIMEOUT * TIMER0_INT_FREQ)
 	static uint16_t key_not_pressed_cnt = 0;
@@ -197,37 +185,95 @@ ISR(TIMER0_COMPA_vect) {
 					
 				last_state_col = col;
 				last_state_row = row;
+				
+				if(dev_state == ADMIN_MOD_AUTH) {
+					switch(keys_pressed[0]) {
+						case '1': {
+							dev_state = ADMIN_MOD_CODE_CHANGE;
+							break;
+						}
+						case '2': {
+							dev_state = ADMIN_MOD_TIME_CHANGE;
+							ee_time_val_ptr = &to_boom_time;
+							break;
+						}
+						case '3': {
+							dev_state = ADMIN_MOD_TIME_CHANGE;
+							ee_time_val_ptr = &to_unarm_time;
+							break;
+						}
+						default: break;
+					}
+					return;
+				}
+				
+				if(dev_state == ADMIN_MOD_TIME_CHANGE) {
+					if((!keys_pressed_num) && ((keys_pressed[0] <= 48) || keys_pressed[0] > 57)) return;
+					if(keys_pressed[keys_pressed_num] == '*' || keys_pressed[keys_pressed_num] == '#') {
+						keys_pressed[keys_pressed_num] = '\0';
+						eeprom_write_word(ee_time_val_ptr, atoi((char*)keys_pressed));
+					}
+				}
 					
 				keys_pressed_num ++;
 					
 				if(keys_pressed_num >= KEY_NUM) {
-					for(uint8_t i = 0; i < KEY_NUM; i++) {
-						//	Check if correct key entered.
-						if(keys_pressed[i] != (dev_state == ROOT_KEY_ENTERING ? pgm_read_byte(&key[i]) : eeprom_read_byte(&arm_code[i]))) {
-							keys_pressed_num = 0;
-							return;
+								
+					if(dev_state != ADMIN_MOD_TIME_CHANGE) {
+						for(uint8_t i = 0; i < KEY_NUM; i++) {
+							//	Change code if needed
+							if(dev_state == ADMIN_MOD_CODE_CHANGE) { 
+								eeprom_write_byte(&arm_code[i], keys_pressed[i]);
+								continue;
+							}
+						
+							//	Check if correct key entered.
+							if(keys_pressed[i] != ((dev_state == ROOT_KEY_ENTERING || dev_state == ADMIN_MOD_UNAUTH) ? 
+									pgm_read_byte(&key[i]) : eeprom_read_byte(&arm_code[i]))) {
+								keys_pressed_num = 0;
+								return;
+							}
 						}
 					}
 						
 					keys_pressed_num = 0;
 					last_state_row = last_state_col = LAST_STATE_IGNORE;
 					Timer0_stop();
-						
-					if(dev_state == ROOT_KEY_ENTERING) {
-						dev_state = UNARMED;
-						eeprom_write_byte(&sw_off_while_armed, 0);
-						INT1_EN;
-					} else {
-						dev_state = ARMED;
+					
+					switch(dev_state) {
+						case ADMIN_MOD_UNAUTH:
+							dev_state = ADMIN_MOD_AUTH;
+							Timer0_start();
+							break;
+						case ADMIN_MOD_CODE_CHANGE:
+							dev_state = UNARMED;
+							INT1_EN;
+							break;
+						case ADMIN_MOD_TIME_CHANGE: {
+							keys_pressed[KEY_NUM] = '\0';
+							eeprom_write_word(ee_time_val_ptr, atoi((char*)keys_pressed));
+							dev_state = UNARMED;
+							INT1_EN;
+							break;				
+						}
+						case ROOT_KEY_ENTERING:
+							dev_state = UNARMED;
+							eeprom_write_byte(&sw_off_while_armed, 0);
+							INT1_EN;
+							break;
+						default: {
+							dev_state = ARMED;
 							
-						to_unarm_cnt = eeprom_read_word(&to_unarm_time);
-						arm_bar_dur = to_unarm_cnt / (double)LCD_COLS * 1000.0;
+							to_unarm_cnt = eeprom_read_word(&to_unarm_time);
+							arm_bar_dur = to_unarm_cnt / (double)LCD_COLS * 1000.0;
 							
-						to_boom_cnt = eeprom_read_word(&to_boom_time);
-						half_to_boom_time = to_boom_cnt >> 1;
-						quarter_to_boom_time = half_to_boom_time >> 1;
-						eeprom_write_byte(&sw_off_while_armed, 1);
-						TIMER1_INT_EN;
+							to_boom_cnt = eeprom_read_word(&to_boom_time);
+							half_to_boom_time = to_boom_cnt >> 1;
+							quarter_to_boom_time = half_to_boom_time >> 1;
+							eeprom_write_byte(&sw_off_while_armed, 1);
+							TIMER1_INT_EN;
+							break;
+						}
 					}
 				}					
 				return;
