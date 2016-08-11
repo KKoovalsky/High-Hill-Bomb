@@ -42,6 +42,7 @@ void keys_entering(const char * str) {
 			main_exec = NULL;
 		}
 	}
+	
 }
 
 void key_display() {
