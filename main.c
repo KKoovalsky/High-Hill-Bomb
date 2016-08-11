@@ -69,12 +69,26 @@ void delay_ms_x (uint16_t ms_del) {
 			if(!delay_cnt_ms) exit = true;
 		}
 		if(exit) break;
-	}	
+	}
 	
 	Timer2_stop();
 }
 
-int main(void) {	
+void set_fptr(volatile f_ptr_t * dest, f_ptr_t src) {
+	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+		*dest = src;
+	}
+}
+
+bool check_fptr(volatile f_ptr_t fptr) {
+	return (fptr != NULL);
+}
+
+bool comp_fptr(volatile f_ptr_t left, f_ptr_t right) {
+	return (left == right);
+}
+
+int main(void) {
 	
 	// Buzzer pin.
 	DDRD |= (1<<PD4);
@@ -109,22 +123,22 @@ int main(void) {
 	// Check if the admin mode is called ('5' key pressed at startup).
 	while(check_admin_mode_call()) {
 		LED_ON;
-	
-		int_exec = get_root_code;
+		
+		set_fptr(&int_exec, get_root_code);
 		Timer0_start(); INT1_DIS;
-		keys_entering(PSTR("Kod admin.:")); 
+		keys_entering(PSTR("Kod admin.:"));
+		if(!CHECK_TIM0_RUN) break;
 
 		// Ask user what does he want to change.
-		int_exec = what_to_change;
-		two_msg(PSTR("Co zmieniæ?"), PSTR("1. Kod uzbr."), PSTR("2. Czas do bum"), PSTR("3. Czas anty-bum"));
-		main_exec = NULL;
+		set_fptr(&int_exec, what_to_change);
+		two_msg(PSTR("Co zmienic?"), PSTR("1. Kod uzbr."), PSTR("2. Czas do bum"), PSTR("3. Czas anty-bum"));
+		set_fptr(&main_exec, NULL);
 		keys_entering((char*)pgm_read_word(&msgs[key_pressed - 48 - 1]));
 		if(!CHECK_TIM0_RUN) break;
 		Timer0_stop();
-		if(main_exec) main_exec();
+		if(check_fptr(main_exec)) main_exec();
 		lcd_str_P(PSTR(" Ustawiono"));
 		delay_ms_x(4000);
-		lcd_cls();
 		break;
 	}
 	
@@ -133,23 +147,23 @@ int main(void) {
 		LED_ON;
 		
 		// Inform why the device is blocked.
-		int_exec = get_root_code;
+		set_fptr(&int_exec, get_root_code);
 		while(true) {
-			two_msg(PSTR("Wyl. w trakcie"), PSTR("odliczania"), PSTR("Dajcie Oskarowi"), PSTR("luj odblokuje xD"));
+			two_msg(PSTR("Wylaczona gdy"), PSTR("uzbrojona"), PSTR("Dajcie Oskarowi"), PSTR("luj odblokuje xD"));
 			keys_entering(PSTR("Kod admin.:"));
 			if(!eeprom_read_byte(&sw_off_while_armed)) break;
 		}
 		lcd_char(key_pressed); lcd_str_P(PSTR(" Odblokowano"));
 		Timer0_stop();
 		delay_ms_x(4000);
-		lcd_cls();
 	}
 	
+	lcd_cls();
 	lcd_str_P(PSTR("Rozbrojona..."));
-    
+	
 	wait_flag = true;
 	
-    while (1) {
+	while (1) {
 		if(!wait_flag) {
 			LED_ON;
 			BUZZER_CLR;
@@ -159,23 +173,24 @@ int main(void) {
 			lcd_locate(1, 0);
 			
 			while((!wait_flag)) {
-				if(main_exec && (!wait_flag)) {
+				if(check_fptr(main_exec) && (!wait_flag)) {
 					main_exec();
-					main_exec = NULL;
+					set_fptr(&main_exec, NULL);
 				}
 			}
-			if(main_exec) { main_exec(); main_exec = NULL;}
+			if(check_fptr(main_exec)) { main_exec(); set_fptr(&main_exec, NULL);}
 			
 			delay_ms_x(4000);
 			
-		} else {
+			} else {
 			LED_OFF;
 			BUZZER_CLR;
 			INT1_EN;
+			set_fptr(&main_exec, NULL);
 			sleep_mode();
-			int_exec = get_arm_code;
+			set_fptr(&int_exec, get_arm_code);
 		}
-    }
+	}
 	
 }
 

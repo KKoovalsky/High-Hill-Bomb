@@ -94,4 +94,8 @@ inline bool check_admin_mode_call() {
 	
 }
 
+void set_fptr(volatile f_ptr_t * dest, f_ptr_t src);
+bool check_fptr(volatile f_ptr_t fptr);
+bool comp_fptr(volatile f_ptr_t left, f_ptr_t right);
+
 #endif /* COMON_H_ */

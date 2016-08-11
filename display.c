@@ -37,9 +37,9 @@ void keys_entering(const char * str) {
 	while(wait_flag) {
 
 		// When key entered update LCD content:
-		if(main_exec && wait_flag) {
+		if(check_fptr(main_exec) && wait_flag) {
 			main_exec();
-			main_exec = NULL;
+			set_fptr(&main_exec, NULL);
 		}
 	}
 	
@@ -70,11 +70,11 @@ void display_unarming() {
 	lcd_cls();
 	lcd_str_P(PSTR("Rozbrajanie..."));
 	lcd_locate(1, 0);
-	while(int_exec == disarming) {
+	while(comp_fptr(int_exec, disarming)) {
 		lcd_char(0xFF);
 		delay_ms_x(eeprom_read_word(&changeable_vars[TO_DISARM_TIME])/(double)LCD_COLS * 1000.0);
 	}
-	if(int_exec == arm_countdown) display_armed();
+	if(comp_fptr(int_exec, arm_countdown)) display_armed();
 	else display_unarmed();
 }
 
