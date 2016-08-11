@@ -7,9 +7,13 @@
 #include <avr/eeprom.h>
 #include <avr/sleep.h>
 #include <avr/cpufunc.h>
+#include <stdbool.h>
+#include <stdlib.h>
 
 #include "LCD/lcd44780.h"
-#include "ext_int.h"
+#include "int.h"
+#include "display.h"
+#include "int_executors.h"
 
 #define KEY_NUM (4)
 
@@ -21,24 +25,24 @@
 #define TIMER2_INT_EN (TIMSK2 |= (1<<OCIE2A))
 #define TIMER2_INT_DIS (TIMSK2 &= ~(1<<OCIE2A))
 
-#define INT1_EN  EIFR |= (1<<INTF1); EIMSK |= (1<<INT1)
+#define CHECK_TIM0_RUN (TCCR0B & ((1<<CS02) | (1<<CS00)))
+
+#define INT1_EN  if(EIFR & (1<<INTF1)) {EIFR |= (1<<INTF1);} EIMSK |= (1<<INT1)
 #define INT1_DIS (EIMSK &= ~(1<<INT1))
 
-#define BUZZER_PIN (1<<PB5)
-#define BUZZER_SET (PORTB |= BUZZER_PIN)
-#define BUZZER_CLR (PORTB &= ~BUZZER_PIN)
-#define BUZZER_SW (PORTB ^= BUZZER_PIN)
+#define BUZZER_PIN (1<<PD4)
+#define BUZZER_SET (PORTD |= BUZZER_PIN)
+#define BUZZER_CLR (PORTD &= ~BUZZER_PIN)
+#define BUZZER_SW (PORTD ^= BUZZER_PIN)
 
-#define BOOOOOOM (dev_state = EXPLODED)
+#define LEFT_DISARM_PIN (1<<PC1)
+#define LEFT_DISARM_PIN_STATE (PINC & LEFT_DISARM_PIN)
 
-#define LEFT_UNARM_PIN (1<<PD3)
-#define LEFT_UNARM_PIN_STATE (PIND & LEFT_UNARM_PIN)
-
-#define RIGHT_UNARM_PIN (1<<PD4)
-#define RIGHT_UNARM_PIN_STATE (PIND & RIGHT_UNARM_PIN)
+#define RIGHT_DISARM_PIN (1<<PD3)
+#define RIGHT_DISARM_PIN_STATE (PIND & RIGHT_DISARM_PIN)
 
 // Time after which LCD backlight switches off.
-#define TIMEOUT (10)
+#define TIMEOUT (20)
 
 #define LED_OFF (PORTC |= (1<<PC0))
 #define LED_ON (PORTC &= ~(1<<PC0))
@@ -46,59 +50,48 @@
 #define TRUE (1)
 #define FALSE (0)
 
-typedef enum dev_state_e {
-	BLOCKED, ROOT_KEY_ENTERING, ROOT_KEY_ENTERED, UNARMED, ARMING, ARMED, EXPLODED, 
-	UNARMING, NOT_EXPLODED, ADMIN_MOD_UNAUTH, ADMIN_MOD_AUTH, ADMIN_MOD_CODE_CHANGE, ADMIN_MOD_TIME_CHANGE
-} dev_state_t;
+#define ARM_CODE (0)
+#define TO_BOOM_TIME (1)
+#define TO_DISARM_TIME (2)
 
-extern volatile dev_state_t dev_state;
+typedef void( * f_ptr_t )( void );
 
-extern uint8_t arm_code [KEY_NUM] EEMEM;
-extern uint16_t to_boom_time EEMEM;
-extern uint16_t to_unarm_time EEMEM;
+extern uint16_t changeable_vars[3] EEMEM;
 
 extern uint8_t sw_off_while_armed EEMEM;
 
 extern volatile uint16_t delay_cnt_ms;
 
-extern volatile uint8_t keys_pressed[];
+extern volatile uint8_t key_pressed;
 extern volatile uint8_t keys_pressed_num;
 
-extern volatile uint16_t arm_bar_dur;
+extern volatile bool wait_flag;
 
-inline void keys_pressed_tab_clr() {
-	keys_pressed[0] = keys_pressed[1] = keys_pressed[2] = keys_pressed[3] = ' ';
-	keys_pressed[4] = '\0';
-}
+extern volatile f_ptr_t main_exec;
 
-inline void Timer0_start() {
-	// Start Timer and set prescaling.
-	TCCR0B |= (1<<CS02) | (1<<CS00);
-	
-	// Clear timer register.
-	TCNT0 = 0;
-}
+void Timer0_start();
+void Timer0_stop();
 
-inline void Timer0_stop() {
-	// Start Timer and set prescaling.
-	TCCR0B &= ~((1<<CS02) | (1<<CS00));
-}
-
-inline void Timer2_start() {
-	// Clear timer register.
-	TCNT2 = 0;
-	
-	// Start Timer and set prescaling.
-	TCCR2B |= (1<<CS21);
-}
-
-inline void Timer2_stop() {
-	// Start Timer and set prescaling.
-	TCCR2B &= ~((1<<CS22) | (1<<CS21) | (1<<CS20));
-}
+void Timer2_start();
+void Timer2_stop();
 
 void delay_ms_x (uint16_t ms_del);
 
-void code_entering(dev_state_t context);
+inline bool check_admin_mode_call() {
+	DDRD |=	(1<<PD1);
+	
+	//	Wait for steady pin state.
+	_NOP(); _NOP();
+	if(!(PINC & (1 << PC3))) {
+		while(!(PINC & (1 << PC3)));
+		DDRD &=	~(1<<PD1);
+		delay_ms_x(100);
+		return true;
+	}
+	
+	DDRD &=	~(1<<PD1);
+	return false;
+	
+}
 
 #endif /* COMON_H_ */
