@@ -87,7 +87,7 @@ void display_unarmed() {
 
 void display_exploded() {
 	lcd_cls();
-	BUZZER_SET;
+	BUZZER1_SET; BUZZER2_SET;
 	lcd_str_P(PSTR("BOOOOOOOOOOOOM!"));
 }
 

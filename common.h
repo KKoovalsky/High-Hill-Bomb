@@ -30,10 +30,16 @@
 #define INT1_EN  if(EIFR & (1<<INTF1)) {EIFR |= (1<<INTF1);} EIMSK |= (1<<INT1)
 #define INT1_DIS (EIMSK &= ~(1<<INT1))
 
-#define BUZZER_PIN (1<<PD4)
-#define BUZZER_SET (PORTD |= BUZZER_PIN)
-#define BUZZER_CLR (PORTD &= ~BUZZER_PIN)
-#define BUZZER_SW (PORTD ^= BUZZER_PIN)
+#define BUZZER1_PIN (1<<PD4)
+#define BUZZER1_SET (PORTD |= BUZZER1_PIN)
+#define BUZZER1_CLR (PORTD &= ~BUZZER1_PIN)
+#define BUZZER1_SW (PORTD ^= BUZZER1_PIN)
+
+#define BUZZER2_PIN (1<<PB2)
+#define BUZZER2_SET (PORTB |= BUZZER2_PIN)
+#define BUZZER2_CLR (PORTB &= ~BUZZER2_PIN)
+#define BUZZER2_SW (PORTB ^= BUZZER2_PIN)
+
 
 #define LEFT_DISARM_PIN (1<<PC1)
 #define LEFT_DISARM_PIN_STATE (PINC & LEFT_DISARM_PIN)
@@ -53,10 +59,11 @@
 #define ARM_CODE (0)
 #define TO_BOOM_TIME (1)
 #define TO_DISARM_TIME (2)
+#define ADMIN_CODE (3)
 
 typedef void( * f_ptr_t )( void );
 
-extern uint16_t changeable_vars[3] EEMEM;
+extern uint16_t changeable_vars[] EEMEM;
 
 extern uint8_t sw_off_while_armed EEMEM;
 

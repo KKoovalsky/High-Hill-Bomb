@@ -1,7 +1,8 @@
 #include "common.h"
+#include "admin_code.h"
 #include <util/atomic.h>
 
-uint16_t changeable_vars[3] EEMEM;
+uint16_t changeable_vars[4] EEMEM;
 
 // If bomb were switched off while armed.
 uint8_t sw_off_while_armed EEMEM;
@@ -20,7 +21,8 @@ const char def_arm_key [] PROGMEM = "1993";
 const char new_code_msg [] PROGMEM = "Nowy kod uzbr.:";
 const char new_disarm_time_msg [] PROGMEM = "Nowy c.uzbr.(*):";
 const char new_countdown_time_msg [] PROGMEM = "Nowy c.rozb.(*):";
-const char * const msgs [3] PROGMEM = {new_code_msg, new_disarm_time_msg, new_countdown_time_msg};
+const char new_admin_code_msg [] PROGMEM = "Nowy kod admin.:";
+const char * const msgs [] PROGMEM = {new_code_msg, new_disarm_time_msg, new_countdown_time_msg, new_admin_code_msg};
 
 void Timer0_start() {
 	// Start Timer and set prescaling.
@@ -54,6 +56,8 @@ static inline void init_eeprom_if_default() {
 	if(eeprom_read_word(&changeable_vars[TO_BOOM_TIME]) == 0xFFFF) eeprom_write_word(&changeable_vars[TO_BOOM_TIME], 40);
 	
 	if(eeprom_read_word(&changeable_vars[TO_DISARM_TIME]) == 0xFFFF) eeprom_write_word(&changeable_vars[TO_DISARM_TIME], 5);
+	
+	if(eeprom_read_word(&changeable_vars[ADMIN_CODE]) == 0xFFFF) eeprom_write_word(&changeable_vars[ADMIN_CODE], pgm_read_word(&admin_code));
 	
 	if(eeprom_read_byte(&sw_off_while_armed) == 0xFF) eeprom_write_byte(&sw_off_while_armed, 0);
 }
@@ -91,7 +95,7 @@ bool comp_fptr(volatile f_ptr_t left, f_ptr_t right) {
 int main(void) {
 	
 	// Buzzer pin.
-	DDRD |= (1<<PD4);
+	DDRD |= (1<<PD4); DDRB |= (1<<PB2);
 	
 	// Backlight pin control.
 	DDRC |= (1<<PC0);
@@ -166,7 +170,7 @@ int main(void) {
 	while (1) {
 		if(!wait_flag) {
 			LED_ON;
-			BUZZER_CLR;
+			BUZZER1_CLR; BUZZER2_CLR;
 			
 			lcd_cls();
 			lcd_str_P(PSTR("Wprowadz kod:"));
@@ -184,7 +188,7 @@ int main(void) {
 			
 			} else {
 			LED_OFF;
-			BUZZER_CLR;
+			BUZZER1_CLR; BUZZER2_CLR;
 			INT1_EN;
 			set_fptr(&main_exec, NULL);
 			sleep_mode();
